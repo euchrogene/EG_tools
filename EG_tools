@@ -117,16 +117,16 @@ do_list() {
     if [ -f "$DATA_FILE" ] && [ -s "$DATA_FILE" ]; then
         echo ""
         echo "--------------------------------------"
-        echo "    Registered EuchroGene Tools"
+        echo "    Registered EuchroGene Tools."
         echo "--------------------------------------"
         cat "$DATA_FILE"
         echo "--------------------------------------"
-        echo "Use 'sudo EG_tools install' to add more tools."
+        echo "Go to 'https://github.com/euchrogene' to install more tools."
         echo ""
     else
         echo ""
         echo "No EuchroGene tools currently installed."
-        echo "To install a tool, use: sudo EG_tools install -r [URL] -d [DIR] -e [EXE] -m [DESC]"
+        echo "To install a tool, go to 'https://github.com/euchrogene'"
         echo ""
     fi
 }
