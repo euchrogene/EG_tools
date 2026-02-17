@@ -22,7 +22,7 @@ usage() {
     echo ""
     echo "Uninstall Options:"
     echo "  -t <TOOL_NAME>   Executable Name to remove"
-    echo "  -i <DOCKER_IMAGE> Docker Image to remove"
+    echo "  -i <DOCKER_IMAGE> Docker Image to remove (find image: docker images)"
     echo "===================================================="
     exit 1
 }
