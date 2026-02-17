@@ -1,0 +1,152 @@
+#!/bin/bash
+
+# Configuration
+TARGET_BIN="/usr/bin"
+DATA_FILE="/usr/share/euchrogene_tools.txt"
+
+# Usage Information
+usage() {
+    echo "===================================================="
+    echo "       EuchroGene Tools Management System"
+    echo "===================================================="
+    echo "Usage:"
+    echo "  EG_tools                          - List installed tools"
+    echo "  sudo EG_tools install [options]    - Install a new tool"
+    echo "  sudo EG_tools uninstall [options]  - Remove an existing tool"
+    echo ""
+    echo "Install Options:"
+    echo "  -r <REPO_URL>    GitHub Repository URL"
+    echo "  -d <REPO_DIR>    Temporary Directory Name"
+    echo "  -e <EXE_FILE>    Executable/Wrapper Name"
+    echo "  -m <DESCRIPTION> Brief Tool Description"
+    echo ""
+    echo "Uninstall Options:"
+    echo "  -t <TOOL_NAME>   Executable Name to remove"
+    echo "  -i <DOCKER_IMAGE> Docker Image to remove"
+    echo "===================================================="
+    exit 1
+}
+
+# 1. Install Function
+do_install() {
+    local REPO_URL="" REPO_DIR="" EXE_FILE="" DESCRIPTION=""
+    
+    OPTIND=2 # Start parsing after 'install' keyword
+    while getopts "r:d:e:m:" opt; do
+        case $opt in
+            r) REPO_URL="$OPTARG" ;;
+            d) REPO_DIR="$OPTARG" ;;
+            e) EXE_FILE="$OPTARG" ;;
+            m) DESCRIPTION="$OPTARG" ;;
+        esac
+    done
+
+    if [[ -z "$REPO_URL" || -z "$REPO_DIR" || -z "$EXE_FILE" ]]; then
+        echo "Error: Missing required arguments for installation."
+        usage
+    fi
+
+    echo ">> Downloading repository from $REPO_URL..."
+    [ -d "$REPO_DIR" ] && sudo rm -rf "$REPO_DIR"
+    git clone "$REPO_URL" && cd "$REPO_DIR" || { echo "Error: Failed to clone repository."; exit 1; }
+    
+    echo ">> Installing executables to $TARGET_BIN..."
+    chmod +x "$EXE_FILE"
+    sudo cp "$EXE_FILE" "$TARGET_BIN/"
+    
+    cd .. && sudo rm -rf "$REPO_DIR"
+
+    # Update Database
+    sudo touch "$DATA_FILE"
+    if ! grep -q "$EXE_FILE" "$DATA_FILE"; then
+        echo "$EXE_FILE => $DESCRIPTION" | sudo tee -a "$DATA_FILE" > /dev/null
+    fi
+    sudo sort -o "$DATA_FILE" "$DATA_FILE"
+    
+    echo ">> Success: $EXE_FILE has been installed."
+}
+
+# 2. Uninstall Function
+do_uninstall() {
+    local TOOL_NAME="" DOCKER_IMAGE=""
+    
+    OPTIND=2
+    while getopts "t:i:" opt; do
+        case $opt in
+            t) TOOL_NAME="$OPTARG" ;;
+            i) DOCKER_IMAGE="$OPTARG" ;;
+        esac
+    done
+
+    if [[ -z "$TOOL_NAME" || -z "$DOCKER_IMAGE" ]]; then
+        echo "Error: Missing required arguments for uninstallation."
+        usage
+    fi
+
+    echo ">> Removing $TOOL_NAME and Docker image: $DOCKER_IMAGE..."
+    
+    # Remove Docker Image
+    if [[ "$(docker images -q "$DOCKER_IMAGE" 2> /dev/null)" != "" ]]; then
+        sudo docker rmi -f "$DOCKER_IMAGE"
+        echo "  - Docker image removed."
+    fi
+    
+    # Remove Executable
+    if [ -f "$TARGET_BIN/$TOOL_NAME" ]; then
+        sudo rm "$TARGET_BIN/$TOOL_NAME"
+        echo "  - Executable wrapper removed."
+    fi
+    
+    # Update Database
+    if [ -f "$DATA_FILE" ]; then
+        sudo sed -i "/$TOOL_NAME/d" "$DATA_FILE"
+        echo "  - Registry updated."
+    fi
+    
+    # Cleanup Database if empty
+    if [ ! -s "$DATA_FILE" ]; then
+        sudo rm "$DATA_FILE"
+        echo "  - All tools removed. Database cleaned."
+    fi
+    
+    echo ">> Uninstallation Complete."
+}
+
+# 3. List Function
+do_list() {
+    if [ -f "$DATA_FILE" ] && [ -s "$DATA_FILE" ]; then
+        echo ""
+        echo "--------------------------------------"
+        echo "    Registered EuchroGene Tools"
+        echo "--------------------------------------"
+        cat "$DATA_FILE"
+        echo "--------------------------------------"
+        echo "Use 'sudo EG_tools install' to add more tools."
+        echo ""
+    else
+        echo ""
+        echo "No EuchroGene tools currently installed."
+        echo "To install a tool, use: sudo EG_tools install -r [URL] -d [DIR] -e [EXE] -m [DESC]"
+        echo ""
+    fi
+}
+
+# --- Main Logic ---
+
+case "$1" in
+    install)
+        do_install "$@"
+        ;;
+    uninstall)
+        do_uninstall "$@"
+        ;;
+    list)
+        do_list
+        ;;
+    "")
+        do_list
+        ;;
+    *)
+        usage
+        ;;
+esac
